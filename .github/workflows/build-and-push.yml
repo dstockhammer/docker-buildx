@@ -74,6 +74,16 @@ jobs:
           TAG_NAME: ${{ env.semver_full }}-${{ env.buildx_version }}
         with:
           script: |
+            try {
+              await github.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `refs/tags/${process.env.TAG_NAME}`
+              })
+            } catch (e) {
+              // nothing to do here
+            }
+
             github.git.createRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
