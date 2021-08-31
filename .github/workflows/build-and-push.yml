@@ -26,7 +26,7 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.DOCKER_ACCESS_TOKEN }}
 
-      - name: Get Version from Dockerfile
+      - name: Get Docker Version from Dockerfile
         run: |
           semver_full=$(head -n1 Dockerfile | grep -oP '([0-9\.]+)')
           semver_major=$(echo "$semver_full" | cut -d '.' -f1)
@@ -43,9 +43,11 @@ jobs:
         with:
           push: true
           tags: |
-            ${{ github.repository }}:${{ env.semver_major }}.${{ env.semver_minor }}.${{ env.semver_patch }}
+            ${{ github.repository }}:latest
+            ${{ github.repository }}:${{ github.sha }}
             ${{ github.repository }}:${{ env.semver_major }}.${{ env.semver_minor }}
-            ${{ github.repository }}:${{ env.semver_major }}
+            ${{ github.repository }}:${{ env.semver_major }}.${{ env.semver_minor }}.${{ env.semver_patch }}
+            ${{ github.repository }}:${{ env.semver_major }}.${{ env.semver_minor }}.${{ env.semver_patch }}
           labels: |
             org.opencontainers.image.version=${{ env.version }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
@@ -53,12 +55,16 @@ jobs:
             org.opencontainers.image.ref.name=${{ github.ref }}
           platforms: linux/amd64,linux/arm64
 
-      - name: Test Docker image
-        run: docker run ${{ github.repository }}:latest buildx version
+      - name: Tag and push Buildx Version from Image
+        run: |
+          buildx_version=$(docker run ${{ github.repository }}:${{ github.sha }} buildx version)
+          docker tag ${{ github.repository }}:${{ github.sha }} ${{ github.repository }}:${{ env.semver_full }}-${{ env.buildx_version }}
+          docker push ${{ github.repository }}:${{ env.semver_full }}-${{ env.buildx_version }}
+          echo "buildx_version=$buildx_version" | tee -a $GITHUB_ENV
 
       - uses: actions/github-script@v4
         env:
-          TAG_NAME: ${{ env.semver_full }}
+          TAG_NAME: ${{ env.semver_full }}-${{ env.buildx_version }}
         with:
           script: |
             github.git.createRef({
