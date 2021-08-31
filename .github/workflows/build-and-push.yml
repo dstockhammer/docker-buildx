@@ -57,7 +57,8 @@ jobs:
 
       - name: Tag and push Buildx Version from Image
         run: |
-          buildx_version=$(docker run ${{ github.repository }}:${{ github.sha }} buildx version)
+          docker run ${{ github.repository }}:${{ github.sha }} buildx version | tee buildx_version.txt
+          buildx_version=$(cat buildx_version.txt | grep -oP '([0-9]+\.[0-9]+\.[0-9]+)')
           docker tag ${{ github.repository }}:${{ github.sha }} ${{ github.repository }}:${{ env.semver_full }}-${{ env.buildx_version }}
           docker push ${{ github.repository }}:${{ env.semver_full }}-${{ env.buildx_version }}
           echo "buildx_version=$buildx_version" | tee -a $GITHUB_ENV
