@@ -1,0 +1,69 @@
+name: Build and push Docker image
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**/README.md"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.DOCKER_ACCESS_TOKEN }}
+
+      - name: Get Version from Dockerfile
+        run: |
+          semver_full=$(head -n1 Dockerfile | grep -oP '([0-9\.]+)')
+          semver_major=$(echo "$semver_full" | cut -d '.' -f1)
+          semver_minor=$(echo "$semver_full" | cut -d '.' -f2)
+          semver_patch=$(echo "$semver_full" | cut -d '.' -f3)
+
+          echo "semver_full=$semver_full"   | tee -a $GITHUB_ENV
+          echo "semver_major=$semver_major" | tee -a $GITHUB_ENV
+          echo "semver_minor=$semver_minor" | tee -a $GITHUB_ENV
+          echo "semver_patch=$semver_patch" | tee -a $GITHUB_ENV
+
+      - name: Docker Build and Push
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          tags: |
+            ${{ github.repository }}:${{ env.semver_major }}.${{ env.semver_minor }}.${{ env.semver_patch }}
+            ${{ github.repository }}:${{ env.semver_major }}.${{ env.semver_minor }}
+            ${{ github.repository }}:${{ env.semver_major }}
+          labels: |
+            org.opencontainers.image.version=${{ env.version }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.ref.name=${{ github.ref }}
+          platforms: linux/amd64,linux/arm64
+
+      - name: Test Docker image
+        run: docker run ${{ github.repository }}:latest buildx version
+
+      - uses: actions/github-script@v4
+        env:
+          TAG_NAME: ${{ env.semver_full }}
+        with:
+          script: |
+            github.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `refs/tags/${process.env.TAG_NAME}`,
+              sha: context.sha
+            })
