@@ -32,7 +32,6 @@ jobs:
           semver_major=$(echo "$semver_full" | cut -d '.' -f1)
           semver_minor=$(echo "$semver_full" | cut -d '.' -f2)
           semver_patch=$(echo "$semver_full" | cut -d '.' -f3)
-
           echo "semver_full=$semver_full"   | tee -a $GITHUB_ENV
           echo "semver_major=$semver_major" | tee -a $GITHUB_ENV
           echo "semver_minor=$semver_minor" | tee -a $GITHUB_ENV
@@ -55,15 +54,22 @@ jobs:
             org.opencontainers.image.ref.name=${{ github.ref }}
           platforms: linux/amd64,linux/arm64
 
-      - name: Tag and push Buildx Version from Image
+      - name: Get Buildx Version from Image
         run: |
           docker run ${{ github.repository }}:${{ github.sha }} buildx version | tee buildx_version.txt
           buildx_version=$(cat buildx_version.txt | grep -oP '([0-9]+\.[0-9]+\.[0-9]+)')
-          docker tag ${{ github.repository }}:${{ github.sha }} ${{ github.repository }}:${{ env.semver_full }}-${{ env.buildx_version }}
-          docker push ${{ github.repository }}:${{ env.semver_full }}-${{ env.buildx_version }}
           echo "buildx_version=$buildx_version" | tee -a $GITHUB_ENV
 
-      - uses: actions/github-script@v4
+      - name: Append Buildx Version to Tag
+        env:
+          SOURCE_TAG: ${{ github.sha }}
+          TARGET_TAG: ${{ env.semver_full }}-${{ env.buildx_version }}
+        run: |
+          docker tag ${{ github.repository }}:${{ env.SOURCE_TAG }} ${{ github.repository }}:${{ env.TARGET_TAG }}
+          docker push ${{ github.repository }}:${{ env.TARGET_TAG }}
+
+      - name: Tag Commit in Repository
+        uses: actions/github-script@v4
         env:
           TAG_NAME: ${{ env.semver_full }}-${{ env.buildx_version }}
         with:
