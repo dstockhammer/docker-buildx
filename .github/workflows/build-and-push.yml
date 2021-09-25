@@ -75,7 +75,7 @@ jobs:
         with:
           script: |
             try {
-              await github.git.deleteRef({
+              await github.rest.git.deleteRef({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 ref: `refs/tags/${process.env.TAG_NAME}`
@@ -84,7 +84,7 @@ jobs:
               // nothing to do here
             }
 
-            github.git.createRef({
+            github.rest.git.createRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
               ref: `refs/tags/${process.env.TAG_NAME}`,
