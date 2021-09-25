@@ -69,7 +69,7 @@ jobs:
           docker push ${{ github.repository }}:${{ env.TARGET_TAG }}
 
       - name: Tag Commit in Repository
-        uses: actions/github-script@v4
+        uses: actions/github-script@v5
         env:
           TAG_NAME: ${{ env.semver_full }}-${{ env.buildx_version }}
         with:
