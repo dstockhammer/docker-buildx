@@ -20,13 +20,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
-      - name: Login to GitHub Container Registry
+      - name: Login to Docker Hub
         uses: docker/login-action@v1
+        if: ${{ github.ref == 'refs/heads/main' }}
         with:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.DOCKER_ACCESS_TOKEN }}
 
-      - name: Get Docker Version from Dockerfile
+      - name: Get Docker version from Dockerfile
         run: |
           semver_full=$(head -n1 Dockerfile | grep -oP '([0-9\.]+)')
           semver_major=$(echo "$semver_full" | cut -d '.' -f1)
@@ -37,8 +38,22 @@ jobs:
           echo "semver_minor=$semver_minor" | tee -a $GITHUB_ENV
           echo "semver_patch=$semver_patch" | tee -a $GITHUB_ENV
 
-      - name: Docker Build and Push
+      - name: Build Docker image
         uses: docker/build-push-action@v2
+        with:
+          context: .
+          load: true
+          tags: ${{ github.repository }}:${{ github.sha }}
+
+      - name: Get Buildx version from image
+        run: |
+          docker run ${{ github.repository }}:${{ github.sha }} buildx version | tee buildx_version.txt
+          buildx_version=$(cat buildx_version.txt | grep -oP '([0-9]+\.[0-9]+\.[0-9]+)')
+          echo "buildx_version=$buildx_version" | tee -a $GITHUB_ENV
+          
+      - name: Cross-build Docker image and push to Docker Hub
+        uses: docker/build-push-action@v2
+        if: ${{ github.ref == 'refs/heads/main' }}
         with:
           push: true
           tags: |
@@ -47,6 +62,7 @@ jobs:
             ${{ github.repository }}:${{ env.semver_major }}.${{ env.semver_minor }}
             ${{ github.repository }}:${{ env.semver_major }}.${{ env.semver_minor }}.${{ env.semver_patch }}
             ${{ github.repository }}:${{ env.semver_major }}.${{ env.semver_minor }}.${{ env.semver_patch }}
+            ${{ github.repository }}:${{ env.semver_major }}.${{ env.semver_minor }}.${{ env.semver_patch }}-${{ env.buildx_version }}
           labels: |
             org.opencontainers.image.version=${{ env.version }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
@@ -54,22 +70,9 @@ jobs:
             org.opencontainers.image.ref.name=${{ github.ref }}
           platforms: linux/amd64,linux/arm64
 
-      - name: Get Buildx Version from Image
-        run: |
-          docker run ${{ github.repository }}:${{ github.sha }} buildx version | tee buildx_version.txt
-          buildx_version=$(cat buildx_version.txt | grep -oP '([0-9]+\.[0-9]+\.[0-9]+)')
-          echo "buildx_version=$buildx_version" | tee -a $GITHUB_ENV
-
-      - name: Append Buildx Version to Tag
-        env:
-          SOURCE_TAG: ${{ github.sha }}
-          TARGET_TAG: ${{ env.semver_full }}-${{ env.buildx_version }}
-        run: |
-          docker tag ${{ github.repository }}:${{ env.SOURCE_TAG }} ${{ github.repository }}:${{ env.TARGET_TAG }}
-          docker push ${{ github.repository }}:${{ env.TARGET_TAG }}
-
-      - name: Tag Commit in Repository
+      - name: Tag commit in repository
         uses: actions/github-script@v5
+        if: ${{ github.ref == 'refs/heads/main' }}
         env:
           TAG_NAME: ${{ env.semver_full }}-${{ env.buildx_version }}
         with:
