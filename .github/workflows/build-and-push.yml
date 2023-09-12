@@ -39,7 +39,7 @@ jobs:
           echo "semver_patch=$semver_patch" | tee -a $GITHUB_ENV
 
       - name: Build Docker image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
           load: true
@@ -52,7 +52,7 @@ jobs:
           echo "buildx_version=$buildx_version" | tee -a $GITHUB_ENV
           
       - name: Cross-build Docker image and push to Docker Hub
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         if: ${{ github.ref == 'refs/heads/main' }}
         with:
           push: true
