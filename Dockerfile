@@ -1,2 +1,2 @@
-FROM docker:29.5.3
+FROM docker:29.6.0
 COPY --from=docker/buildx-bin /buildx /usr/libexec/docker/cli-plugins/docker-buildx
